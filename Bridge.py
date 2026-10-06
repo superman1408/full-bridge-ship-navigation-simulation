@@ -32,25 +32,6 @@ class BridgeSimulator(tk.Tk):
         self.heading = tk.IntVar(value=45)
         self.throttle = tk.IntVar(value=39)
         self.mode = tk.StringVar(value="AUTO PILOT")
-        
-        # ----------------------------------------
-        # STAGE 1 — VESSEL SIMULATION STATE
-        # ----------------------------------------
-
-        self.vessel_x = 0.0          # metres
-        self.vessel_y = 0.0          # metres
-
-        self.vessel_heading = 45.0   # degrees
-        self.vessel_speed = 0.0      # knots
-
-        self.vessel_cog = 45.0       # degrees
-        self.rate_of_turn = 0.0      # degrees/second
-
-        self.rudder_angle = 0.0      # degrees
-
-        self.simulation_time = time.monotonic()
-        
-        
         self.tug_fast = [tk.BooleanVar(value=False) for _ in range(4)]
         self.phase_index = 0
         self.phase_mode = "PREVIEW"
@@ -185,12 +166,9 @@ class BridgeSimulator(tk.Tk):
         depth.pack(fill="x")
         tk.Label(depth, text="184.6 m", bg=PANEL, fg=CYAN,
                  font=("TkFixedFont", 23), padx=12, pady=10).pack(anchor="w")
-        # tk.Label(depth, text="UNDER KEEL CLEARANCE     179.8 m",
-        #          bg=PANEL, fg=GREEN, font=("TkFixedFont", 9), padx=12,
-        #          pady=(0, 10)).pack(anchor="w")
         tk.Label(depth, text="UNDER KEEL CLEARANCE     179.8 m",
-            bg=PANEL, fg=GREEN, font=("TkFixedFont", 9), padx=12,
-            pady=0).pack(anchor="w", pady=(0, 10))
+                 bg=PANEL, fg=GREEN, font=("TkFixedFont", 9), padx=12,
+                 pady=0).pack(anchor="w", pady=(0, 10))
         return col
 
     def _metric(self, parent, label, value, unit, row, col, color=TEXT):
@@ -236,19 +214,6 @@ class BridgeSimulator(tk.Tk):
                                      font=("TkFixedFont", 10))
         self.thrust_label.pack(anchor="w", padx=13, pady=12)
         return col
-    
-    
-    def _change_rudder(self, delta):
-
-        self.rudder_angle += delta
-
-        self.rudder_angle = max(
-            -35,
-            min(35, self.rudder_angle)
-        )
-
-        self._refresh()
-        
 
     def _right_column(self, parent):
         col = tk.Frame(parent, bg=BG)
@@ -256,36 +221,11 @@ class BridgeSimulator(tk.Tk):
         control.pack(fill="x", pady=(0, 10))
         row = tk.Frame(control, bg=PANEL)
         row.pack(fill="x", padx=10, pady=(12, 5))
-        # self._button(row, "◀ 5°", lambda: self._turn(-5)).pack(side="left")
-        # self.course_label = tk.Label(row, text="045°", bg=PANEL, fg=CYAN,
-        #                              font=("TkFixedFont", 21))
-        # self.course_label.pack(side="left", expand=True)
-        # self._button(row, "5° ▶", lambda: self._turn(5)).pack(side="right")
-        
-        self._button(
-            row,
-            "◀ 5°",
-            lambda: self._change_rudder(-5)
-        ).pack(side="left")
-
-        self.course_label = tk.Label(
-            row,
-            text="045°",
-            bg=PANEL,
-            fg=CYAN,
-            font=("TkFixedFont", 21)
-        )
-
-        self.course_label.pack(
-            side="left",
-            expand=True
-        )
-
-        self._button(
-            row,
-            "5° ▶",
-            lambda: self._change_rudder(5)
-        ).pack(side="right")
+        self._button(row, "◀ 5°", lambda: self._turn(-5)).pack(side="left")
+        self.course_label = tk.Label(row, text="045°", bg=PANEL, fg=CYAN,
+                                     font=("TkFixedFont", 21))
+        self.course_label.pack(side="left", expand=True)
+        self._button(row, "5° ▶", lambda: self._turn(5)).pack(side="right")
         tk.Label(control, text="COURSE SELECT", bg=PANEL, fg=MUTED,
                  font=("TkDefaultFont", 8, "bold"), padx=12).pack(anchor="w", pady=(6, 0))
         ttk.Scale(control, from_=0, to=359, variable=self.heading,
@@ -660,176 +600,26 @@ class BridgeSimulator(tk.Tk):
     def _set_throttle(self, value):
         self.throttle.set(max(0, min(100, int(value))))
         self._refresh()
-        
-        
-    def _update_vessel(self, dt):
-        """
-        Stage 1 vessel motion model.
 
-        This is intentionally a simple training model:
-        throttle -> speed
-        rudder -> turning
-        heading + speed -> X/Y position
-        """
-
-        # ----------------------------------------
-        # ENGINE RESPONSE
-        # ----------------------------------------
-
-        throttle = float(self.throttle.get())
-
-        target_speed = throttle * 0.318
-
-        # Simple acceleration / deceleration
-        acceleration = 0.15
-
-        if self.vessel_speed < target_speed:
-            self.vessel_speed += acceleration * dt
-
-        elif self.vessel_speed > target_speed:
-            self.vessel_speed -= acceleration * dt
-
-        self.vessel_speed = max(0.0, min(self.vessel_speed, target_speed))
-
-
-        # ----------------------------------------
-        # RUDDER
-        # ----------------------------------------
-
-        rudder = self.rudder_angle
-
-        # Simple yaw response.
-        # More rudder + more speed = more turning.
-        max_rate = 0.12 * self.vessel_speed
-
-        target_rot = (rudder / 35.0) * max_rate
-
-        # Smooth response
-        yaw_response = 0.8
-
-        self.rate_of_turn += (
-            target_rot - self.rate_of_turn
-        ) * yaw_response * dt
-
-        self.vessel_heading += self.rate_of_turn * dt
-
-        self.vessel_heading %= 360
-
-
-        # ----------------------------------------
-        # VESSEL MOVEMENT
-        # ----------------------------------------
-
-        speed_mps = self.vessel_speed * 0.514444
-
-        heading_rad = math.radians(self.vessel_heading)
-
-        self.vessel_x += (
-            math.sin(heading_rad)
-            * speed_mps
-            * dt
-        )
-
-        self.vessel_y += (
-            math.cos(heading_rad)
-            * speed_mps
-            * dt
-        )
-
-
-        # ----------------------------------------
-        # COURSE OVER GROUND
-        # ----------------------------------------
-
-        if speed_mps > 0.01:
-
-            dx = math.sin(heading_rad)
-            dy = math.cos(heading_rad)
-
-            self.vessel_cog = (
-                math.degrees(math.atan2(dx, dy))
-                + 360
-            ) % 360
-            
-            
     def _refresh(self):
-
         h = int(float(self.heading.get())) % 360
         throttle = int(float(self.throttle.get()))
-
+        speed = throttle * 0.318
         if self.course_label:
-
-            self.course_label.config(
-                text=f"{self.vessel_heading:03.0f}°"
-            )
-
-            self.heading_value.config(
-                text=f"{self.vessel_heading:03.0f}° TRUE"
-            )
-
-            self.mode_label.config(
-                text=f"HEADING MODE · {self.mode.get()}"
-            )
-
-            self.sog_label.config(
-                text=f"{self.vessel_speed:.1f} kn"
-            )
-
-            self.cog_label.config(
-                text=f"{self.vessel_cog:03.0f} °"
-            )
-
-            self.rpm_label.config(
-                text=f"SHAFT RPM   {180 + int(throttle * 11.1)} rpm"
-            )
-
-            self.thrust_label.config(
-                text=(
-                    f"THRUST   {throttle}%\n\n"
-                    f"RUDDER   {self.rudder_angle:.1f}°"
-                )
-            )
-
+            self.course_label.config(text=f"{h:03d}°")
+            self.heading_value.config(text=f"{h:03d}° TRUE")
+            self.mode_label.config(text=f"HEADING MODE · {self.mode.get()}")
+            self.sog_label.config(text=f"{speed:.1f} kn")
+            self.cog_label.config(text=f"{h:03d} °")
+            self.rpm_label.config(text=f"SHAFT RPM   {180 + int(throttle*11.1)} rpm")
+            self.thrust_label.config(text=f"THRUST   {throttle}%\n\nRUDDER   0.0°")
             self.rpm_canvas.delete("all")
-
-            w = max(
-                1,
-                self.rpm_canvas.winfo_width()
-            )
-
-            self.rpm_canvas.create_rectangle(
-                0,
-                0,
-                w * throttle / 100,
-                12,
-                fill=GREEN,
-                outline=""
-            )
-
-        self._update_tug_gate(self.vessel_speed)
-
+            w = max(1, self.rpm_canvas.winfo_width())
+            self.rpm_canvas.create_rectangle(0, 0, w*throttle/100, 12,
+                                             fill=GREEN, outline="")
+        self._update_tug_gate(speed)
         self._draw_compass()
         self._draw_chart()
-
-    # def _refresh(self):
-    #     h = int(float(self.heading.get())) % 360
-    #     throttle = int(float(self.throttle.get()))
-    #     speed = throttle * 0.318
-    #     if self.course_label:
-    #         self.course_label.config(text=f"{h:03d}°")
-    #         self.heading_value.config(text=f"{h:03d}° TRUE")
-    #         self.mode_label.config(text=f"HEADING MODE · {self.mode.get()}")
-    #         self.sog_label.config(text=f"{speed:.1f} kn")
-    #         self.cog_label.config(text=f"{h:03d} °")
-    #         self.rpm_label.config(text=f"SHAFT RPM   {180 + int(throttle*11.1)} rpm")
-    #         self.thrust_label.config(text=f"THRUST   {throttle}%\n\nRUDDER   0.0°")
-    #         self.rpm_canvas.delete("all")
-    #         w = max(1, self.rpm_canvas.winfo_width())
-    #         self.rpm_canvas.create_rectangle(0, 0, w*throttle/100, 12,
-    #                                          fill=GREEN, outline="")
-    #     self._update_tug_gate(speed)
-    #     self._draw_compass()
-    #     self._draw_chart()
 
     def _update_tug_gate(self, speed):
         if not self.tug_value:
@@ -982,28 +772,13 @@ class BridgeSimulator(tk.Tk):
                       fill=AMBER, anchor="w", font=("TkFixedFont", 8))
         c.create_text(w*.27, h*.28, text="✣  TRAINING CONTACT", fill=RED,
                       font=("TkFixedFont", 9))
-        # cx, cy = w*px, h*py
-        
-        # ----------------------------------------
-        # STAGE 1 — ACTUAL VESSEL POSITION
-        # ----------------------------------------
-
-        # Chart origin
-        chart_center_x = w * 0.50
-        chart_center_y = h * 0.50
-
-        # Display scale
-        scale = min(w, h) / 1000.0
-
-        cx = chart_center_x + self.vessel_x * scale
-        cy = chart_center_y - self.vessel_y * scale
+        cx, cy = w*px, h*py
         # Top-down LNG carrier: tapered hull, four membrane tank blocks, aft house.
         screen_dx, screen_dy = ux*w, uy*h
         screen_len = math.hypot(screen_dx, screen_dy) or 1
         hx, hy = screen_dx/screen_len, screen_dy/screen_len
         nx, ny = -hy, hx
-        # angle = math.atan2(hx, -hy)
-        angle = math.radians(self.vessel_heading)
+        angle = math.atan2(hx, -hy)
         vessel_scale = min(w, h)
         def local_polygon(coords, fill, outline, width=1):
             rotated = []
@@ -1086,60 +861,12 @@ class BridgeSimulator(tk.Tk):
             x, y = cx+bx*r, cy+by*r
             c.create_oval(x-3, y-3, x+3, y+3, fill=color, outline="")
 
-    # def _tick(self):
-    #     self.clock_label.config(text="● SIMULATION LIVE   ·   UTC " +
-    #                             datetime.now(timezone.utc).strftime("%H:%M:%S"))
-    #     self.sweep_angle = (self.sweep_angle + 4) % 360
-    #     self._draw_radar()
-    #     self.after(100, self._tick)
-    
-    
     def _tick(self):
-
-        now = time.monotonic()
-
-        dt = now - self.simulation_time
-
-        self.simulation_time = now
-
-        # Prevent a huge jump if the window freezes
-        dt = min(dt, 0.1)
-
-        # ----------------------------------------
-        # RUN VESSEL SIMULATION
-        # ----------------------------------------
-
-        self._update_vessel(dt)
-
-        # ----------------------------------------
-        # CLOCK
-        # ----------------------------------------
-
-        self.clock_label.config(
-            text="● SIMULATION LIVE   ·   UTC " +
-            datetime.now(timezone.utc).strftime("%H:%M:%S")
-        )
-
-        # ----------------------------------------
-        # RADAR
-        # ----------------------------------------
-
-        self.sweep_angle = (
-            self.sweep_angle + 4
-        ) % 360
-
+        self.clock_label.config(text="● SIMULATION LIVE   ·   UTC " +
+                                datetime.now(timezone.utc).strftime("%H:%M:%S"))
+        self.sweep_angle = (self.sweep_angle + 4) % 360
         self._draw_radar()
-
-        # ----------------------------------------
-        # GUI
-        # ----------------------------------------
-
-        self._refresh()
-
-        self.after(
-            100,
-            self._tick
-        )
+        self.after(100, self._tick)
 
 
 if __name__ == "__main__":
