@@ -26,7 +26,7 @@ class BridgeSimulator(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Full Bridge — Ship Navigation Simulation")
-        self.geometry("1460x1000")
+        self.geometry("1300x760")
         self.minsize(1120, 760)
         self.configure(bg=BG)
         self.heading = tk.IntVar(value=45)
