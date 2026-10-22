@@ -989,14 +989,29 @@ class BridgeSimulator(tk.Tk):
         # ----------------------------------------
 
         # Chart origin
-        chart_center_x = w * 0.50
-        chart_center_y = h * 0.50
+        # chart_center_x = w * 0.50
+        # chart_center_y = h * 0.50
 
         # Display scale
+        # scale = min(w, h) / 1000.0
+
+        # cx = chart_center_x + self.vessel_x * scale
+        # cy = chart_center_y - self.vessel_y * scale
+        
+        
+        # Pilot Boarding Station is the local simulation origin.
+        # It is located at the first point of the schematic route.
+
+        pilot_x = w * 0.12
+        pilot_y = h * 0.82
+
+        # Display scale: simulation metres to screen pixels.
         scale = min(w, h) / 1000.0
 
-        cx = chart_center_x + self.vessel_x * scale
-        cy = chart_center_y - self.vessel_y * scale
+        # Ship position relative to the Pilot Boarding Station.
+        cx = pilot_x + self.vessel_x * scale
+        cy = pilot_y - self.vessel_y * scale
+
         # Top-down LNG carrier: tapered hull, four membrane tank blocks, aft house.
         screen_dx, screen_dy = ux*w, uy*h
         screen_len = math.hypot(screen_dx, screen_dy) or 1
