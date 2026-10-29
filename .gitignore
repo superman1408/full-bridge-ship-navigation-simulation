@@ -149,6 +149,13 @@ activemq-data/
 # SageMath parsed files
 *.sage.py
 
+# Rough drafts
+Q-max.py
+Q-max_navigation_replica.py
+ship_navigation_replica.py
+
+
+
 # Environments
 .env
 .envrc
@@ -218,3 +225,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+force1.py
+force.py
