@@ -225,5 +225,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+<<<<<<< HEAD
 force1.py
 force.py
+=======
+
+
+simu.py
+>>>>>>> ba5f3220fe135894f0bac7b3d63cda28551f1cad
+ship_control.py
+resultant_force_calculator.py
+ship_berthing_simulator.py
+test_ship_berthing_physics.py
