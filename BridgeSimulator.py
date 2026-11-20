@@ -9,6 +9,7 @@ import time
 import tkinter as tk
 from tkinter import ttk
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 BG = "#07111c"
 PANEL = "#0d1b29"
@@ -25,10 +26,35 @@ RED = "#ff707b"
 class BridgeSimulator(tk.Tk):
     def __init__(self):
         super().__init__()
+        # self.title("Full Bridge — Ship Navigation Simulation")
+        # self.geometry("1400x1500")
+        # self.minsize(1400, 1500)
+        # self.configure(bg=BG)
+        # self.heading = tk.IntVar(value=45)
+        # self.throttle = tk.IntVar(value=39)
+        # self.mode = tk.StringVar(value="AUTO PILOT")
+        
         self.title("Full Bridge — Ship Navigation Simulation")
-        self.geometry("1300x760")
-        self.minsize(1120, 760)
+
+        # Proper window resolution
+        self.geometry("1400x850")
+        self.minsize(1000, 650)
+
+        # Center the window on the screen
+        self.update_idletasks()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        window_width = min(1400, screen_width - 80)
+        window_height = min(850, screen_height - 100)
+
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+
+        self.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
         self.configure(bg=BG)
+
         self.heading = tk.IntVar(value=45)
         self.throttle = tk.IntVar(value=39)
         self.mode = tk.StringVar(value="AUTO PILOT")
@@ -205,37 +231,303 @@ class BridgeSimulator(tk.Tk):
         value_label.pack(anchor="w")
         return value_label
 
+    # def _center_column(self, parent):
+    #     col = tk.Frame(parent, bg=BG)
+    #     col.rowconfigure(0, weight=1)
+    #     col.columnconfigure(0, weight=1)
+    #     chart_card = self._card(col, "Electronic chart display", "ENC · SCALE 1:72,000")
+    #     chart_card.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+    #     self.chart = tk.Canvas(chart_card, bg="#0a1c27", highlightthickness=0)
+    #     self.chart.pack(fill="both", expand=True)
+    #     self.chart.bind("<Configure>", lambda _e: self._draw_chart())
+
+    #     lower = tk.Frame(col, bg=BG)
+    #     lower.grid(row=1, column=0, sticky="ew")
+    #     lower.columnconfigure(0, weight=1)
+    #     lower.columnconfigure(1, weight=1)
+    #     radar_card = self._card(lower, "X-band radar", "3.0 NM · RELATIVE")
+    #     radar_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+    #     self.radar = tk.Canvas(radar_card, bg=PANEL, height=170, highlightthickness=0)
+    #     self.radar.pack(fill="both", expand=True)
+    #     self.radar.bind("<Configure>", lambda _e: self._draw_radar())
+    #     engine = self._card(lower, "Engine telegraph", "M/E")
+    #     engine.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+    #     self.rpm_label = tk.Label(engine, text="SHAFT RPM   612 rpm", bg=PANEL,
+    #                               fg=TEXT, font=("TkFixedFont", 10))
+    #     self.rpm_label.pack(anchor="w", padx=13, pady=(15, 8))
+    #     self.rpm_canvas = tk.Canvas(engine, height=12, bg="#1a3040", highlightthickness=0)
+    #     self.rpm_canvas.pack(fill="x", padx=13)
+    #     self.thrust_label = tk.Label(engine, text="THRUST   39%\n\nRUDDER   0.0°",
+    #                                  bg=PANEL, fg=MUTED, justify="left",
+    #                                  font=("TkFixedFont", 10))
+    #     self.thrust_label.pack(anchor="w", padx=13, pady=12)
+    #     return col
+    
+    
     def _center_column(self, parent):
         col = tk.Frame(parent, bg=BG)
+
+        # Allow the center column to fill its parent
         col.rowconfigure(0, weight=1)
         col.columnconfigure(0, weight=1)
-        chart_card = self._card(col, "Electronic chart display", "ENC · SCALE 1:72,000")
-        chart_card.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
-        self.chart = tk.Canvas(chart_card, bg="#0a1c27", highlightthickness=0)
-        self.chart.pack(fill="both", expand=True)
-        self.chart.bind("<Configure>", lambda _e: self._draw_chart())
 
-        lower = tk.Frame(col, bg=BG)
-        lower.grid(row=1, column=0, sticky="ew")
-        lower.columnconfigure(0, weight=1)
-        lower.columnconfigure(1, weight=1)
-        radar_card = self._card(lower, "X-band radar", "3.0 NM · RELATIVE")
-        radar_card.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
-        self.radar = tk.Canvas(radar_card, bg=PANEL, height=170, highlightthickness=0)
+        # Scrollable area
+        scroll_container = tk.Frame(col, bg=BG)
+        scroll_container.grid(row=0, column=0, sticky="nsew")
+
+        scroll_container.rowconfigure(0, weight=1)
+        scroll_container.columnconfigure(0, weight=1)
+
+        canvas = tk.Canvas(
+            scroll_container,
+            bg=BG,
+            highlightthickness=0,
+            borderwidth=0
+        )
+        scrollbar = ttk.Scrollbar(
+            scroll_container,
+            orient="vertical",
+            command=canvas.yview
+        )
+
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # All center-column cards go inside this frame
+        content = tk.Frame(canvas, bg=BG)
+
+        content_window = canvas.create_window(
+            (0, 0),
+            window=content,
+            anchor="nw"
+        )
+
+        def update_scroll_region(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def update_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+
+        content.bind("<Configure>", update_scroll_region)
+        canvas.bind("<Configure>", update_content_width)
+
+        # Mouse-wheel scrolling on Windows
+        def on_mousewheel(event):
+            canvas.yview_scroll(-1 * (event.delta // 120), "units")
+
+        canvas.bind("<MouseWheel>", on_mousewheel)
+        content.bind("<MouseWheel>", on_mousewheel)
+
+        # ---------------- ELECTRONIC CHART ----------------
+        # chart_card = self._card(
+        #     content,
+        #     "Electronic chart display",
+        #     "ENC · SCALE 1:72,000"
+        # )
+        # chart_card.pack(fill="both", expand=True, pady=(0, 10))
+
+        # self.chart = tk.Canvas(
+        #     chart_card,
+        #     bg="#0a1c27",
+        #     height=380,
+        #     highlightthickness=0
+        # )
+        # self.chart.pack(fill="both", expand=True)
+        # self.chart.bind("<Configure>", lambda _e: self._draw_chart())
+        
+        
+       
+        # ---------------- ELECTRONIC CHART ----------------
+        chart_card = self._card(
+            content,
+            "Electronic chart display",
+            "ENC · SCALE 1:72,000"
+        )
+        chart_card.pack(fill="both", expand=True, pady=(0, 10))
+
+        # Initialize zoom and pan only once
+        if not hasattr(self, "chart_zoom"):
+            self.chart_zoom = 1.0
+            self.chart_pan_x = 0
+            self.chart_pan_y = 0
+
+        # ---------------- ZOOM TOOLBAR ----------------
+        chart_toolbar = tk.Frame(chart_card, bg=PANEL)
+        chart_toolbar.pack(fill="x", padx=8, pady=5)
+
+        self.chart_zoom_label = tk.Label(
+            chart_toolbar,
+            text=f"ZOOM {self.chart_zoom * 100:.0f}%",
+            bg=PANEL,
+            fg=CYAN,
+            font=("TkFixedFont", 9)
+        )
+        self.chart_zoom_label.pack(side="left", padx=5)
+
+        def change_chart_zoom(factor):
+            self.chart_zoom = max(
+                0.25,
+                min(5.0, self.chart_zoom * factor)
+            )
+
+            self.chart_zoom_label.config(
+                text=f"ZOOM {self.chart_zoom * 100:.0f}%"
+            )
+            self._draw_chart()
+
+        def reset_chart_view():
+            self.chart_zoom = 1.0
+            self.chart_pan_x = 0
+            self.chart_pan_y = 0
+
+            self.chart_zoom_label.config(text="ZOOM 100%")
+            self._draw_chart()
+
+        tk.Button(
+            chart_toolbar,
+            text="+",
+            command=lambda: change_chart_zoom(1.25),
+            bg="#164334",
+            fg=TEXT,
+            relief="flat",
+            width=4
+        ).pack(side="right", padx=2)
+
+        tk.Button(
+            chart_toolbar,
+            text="−",
+            command=lambda: change_chart_zoom(0.8),
+            bg="#164334",
+            fg=TEXT,
+            relief="flat",
+            width=4
+        ).pack(side="right", padx=2)
+
+        tk.Button(
+            chart_toolbar,
+            text="RESET",
+            command=reset_chart_view,
+            bg="#1b3040",
+            fg=TEXT,
+            relief="flat",
+            padx=8
+        ).pack(side="right", padx=2)
+
+        # ---------------- CHART CANVAS ----------------
+        self.chart = tk.Canvas(
+            chart_card,
+            bg="#0a1c27",
+            height=380,
+            highlightthickness=0
+        )
+        self.chart.pack(fill="both", expand=True)
+
+        # Redraw the chart when its size changes
+        self.chart.bind(
+            "<Configure>",
+            lambda event: self._draw_chart()
+        )
+
+        # Mouse-wheel zoom (Windows)
+        def chart_mousewheel(event):
+            if event.delta > 0:
+                change_chart_zoom(1.1)
+            else:
+                change_chart_zoom(1 / 1.1)
+
+        self.chart.bind("<MouseWheel>", chart_mousewheel)
+
+        # Drag chart to pan
+        def chart_drag_start(event):
+            self._chart_drag_x = event.x
+            self._chart_drag_y = event.y
+
+        def chart_drag_move(event):
+            dx = event.x - self._chart_drag_x
+            dy = event.y - self._chart_drag_y
+
+            self.chart_pan_x += dx
+            self.chart_pan_y += dy
+
+            self._chart_drag_x = event.x
+            self._chart_drag_y = event.y
+
+            self._draw_chart()
+
+        self.chart.bind("<ButtonPress-1>", chart_drag_start)
+        self.chart.bind("<B1-Motion>", chart_drag_move)
+
+
+
+        # ---------------- LOWER PANELS ----------------
+        lower = tk.Frame(content, bg=BG)
+        lower.pack(fill="x", pady=(0, 5))
+
+        lower.columnconfigure(0, weight=1, uniform="lower")
+        lower.columnconfigure(1, weight=1, uniform="lower")
+
+        # Radar card
+        radar_card = self._card(
+            lower,
+            "X-band radar",
+            "3.0 NM · RELATIVE"
+        )
+        radar_card.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=(0, 5)
+        )
+
+        self.radar = tk.Canvas(
+            radar_card,
+            bg=PANEL,
+            height=200,
+            highlightthickness=0
+        )
         self.radar.pack(fill="both", expand=True)
         self.radar.bind("<Configure>", lambda _e: self._draw_radar())
+
+        # Engine telegraph card
         engine = self._card(lower, "Engine telegraph", "M/E")
-        engine.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
-        self.rpm_label = tk.Label(engine, text="SHAFT RPM   612 rpm", bg=PANEL,
-                                  fg=TEXT, font=("TkFixedFont", 10))
+        engine.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=(5, 0)
+        )
+
+        self.rpm_label = tk.Label(
+            engine,
+            text="SHAFT RPM   612 rpm",
+            bg=PANEL,
+            fg=TEXT,
+            font=("TkFixedFont", 10)
+        )
         self.rpm_label.pack(anchor="w", padx=13, pady=(15, 8))
-        self.rpm_canvas = tk.Canvas(engine, height=12, bg="#1a3040", highlightthickness=0)
+
+        self.rpm_canvas = tk.Canvas(
+            engine,
+            height=12,
+            bg="#1a3040",
+            highlightthickness=0
+        )
         self.rpm_canvas.pack(fill="x", padx=13)
-        self.thrust_label = tk.Label(engine, text="THRUST   39%\n\nRUDDER   0.0°",
-                                     bg=PANEL, fg=MUTED, justify="left",
-                                     font=("TkFixedFont", 10))
+
+        self.thrust_label = tk.Label(
+            engine,
+            text="THRUST   39%\n\nRUDDER   0.0°",
+            bg=PANEL,
+            fg=MUTED,
+            justify="left",
+            font=("TkFixedFont", 10)
+        )
         self.thrust_label.pack(anchor="w", padx=13, pady=12)
+
         return col
+
     
     
     def _change_rudder(self, delta):
@@ -302,12 +594,65 @@ class BridgeSimulator(tk.Tk):
             ttk.Radiobutton(control, text=mode, value=mode, variable=self.mode,
                             command=self._refresh).pack(side="left", padx=9, pady=(4, 12))
 
+        # tug = self._card(col, "LNGC berth tug simulation", "DAHEJ · USER SCENARIO")
+        # tug.pack(fill="both", expand=True, pady=(0, 10))
+        
+        # Tug simulation card
         tug = self._card(col, "LNGC berth tug simulation", "DAHEJ · USER SCENARIO")
         tug.pack(fill="both", expand=True, pady=(0, 10))
-        tk.Label(tug, text="INJECT A STUDY SCENARIO", bg=PANEL, fg=MUTED,
+
+        # Scrollbar on the right
+        tug_scrollbar = ttk.Scrollbar(tug, orient="vertical")
+        tug_scrollbar.pack(side="right", fill="y")
+
+        # Canvas fills the remaining card width
+        tug_canvas = tk.Canvas(
+            tug,
+            bg=PANEL,
+            highlightthickness=0,
+            borderwidth=0,
+            yscrollcommand=tug_scrollbar.set
+        )
+        tug_canvas.pack(side="left", fill="both", expand=True)
+        tug_scrollbar.config(command=tug_canvas.yview)
+
+        # All scrollable widgets go inside this frame
+        tug_content = tk.Frame(tug_canvas, bg=PANEL)
+
+        tug_window = tug_canvas.create_window(
+            (0, 0),
+            window=tug_content,
+            anchor="nw"
+        )
+
+        # Update scrolling area
+        tug_content.bind(
+            "<Configure>",
+            lambda event: tug_canvas.configure(
+                scrollregion=tug_canvas.bbox("all")
+            )
+        )
+
+        # Match inner frame width to canvas width
+        tug_canvas.bind(
+            "<Configure>",
+            lambda event: tug_canvas.itemconfigure(
+                tug_window,
+                width=event.width
+            )
+        )
+
+        # Mouse wheel support on Windows
+        def _tug_mousewheel(event):
+            tug_canvas.yview_scroll(-1 * (event.delta // 120), "units")
+
+        tug_canvas.bind("<MouseWheel>", _tug_mousewheel)
+        tug_content.bind("<MouseWheel>", _tug_mousewheel)
+
+        tk.Label(tug_content, text="INJECT A STUDY SCENARIO", bg=PANEL, fg=MUTED,
                  font=("TkDefaultFont", 8, "bold"), padx=10).pack(anchor="w", pady=(8, 2))
         self.scenario_combo = ttk.Combobox(
-            tug, state="readonly", width=34,
+            tug_content, state="readonly", width=34,
             values=("A · 35 kn wind · limits unknown", "B · wind data invalid",
                     "C · one tug unavailable", "D · speed above training gate",
                     "E · authority missing", "F · control input failure",
@@ -315,18 +660,18 @@ class BridgeSimulator(tk.Tk):
         self.scenario_combo.current(0)
         self.scenario_combo.pack(fill="x", padx=10, pady=(0, 5))
         self.scenario_combo.bind("<<ComboboxSelected>>", self._scenario_changed)
-        self.scenario_result = tk.Label(tug, text="", bg="#321e20", fg="#ffb3b7",
+        self.scenario_result = tk.Label(tug_content, text="", bg="#321e20", fg="#ffb3b7",
                                         justify="left", wraplength=275,
                                         font=("TkFixedFont", 9), padx=9, pady=8)
         self.scenario_result.pack(fill="x", padx=9, pady=4)
-        self.wind_state = tk.Label(tug, text="FROM SSW · LIMIT UNKNOWN", bg=PANEL,
+        self.wind_state = tk.Label(tug_content, text="FROM SSW · LIMIT UNKNOWN", bg=PANEL,
                                    fg=AMBER, font=("TkFixedFont", 8))
         self.wind_state.pack(anchor="w", padx=10, pady=3)
-        self._build_channel_review(tug)
-        tk.Label(tug, text="PILOT BOARDING STATION → PETRONET LNG BERTH\nSchematic training phases · no charted track",
+        self._build_channel_review(tug_content)
+        tk.Label(tug_content, text="PILOT BOARDING STATION → PETRONET LNG BERTH\nSchematic training phases · no charted track",
                  bg=PANEL, fg=MUTED, justify="left", font=("TkFixedFont", 9),
                  padx=10, pady=5).pack(anchor="w")
-        phase_box = tk.Frame(tug, bg="#102333", highlightbackground="#214153", highlightthickness=1)
+        phase_box = tk.Frame(tug_content, bg="#102333", highlightbackground="#214153", highlightthickness=1)
         phase_box.pack(fill="x", padx=10, pady=6)
         self.phase_label = tk.Label(phase_box, text="Pilot Boarding Station", bg="#102333",
                                     fg=CYAN, font=("TkFixedFont", 10))
@@ -334,7 +679,7 @@ class BridgeSimulator(tk.Tk):
         self.distance_label = tk.Label(phase_box, text="2.5 NM*", bg="#102333",
                                        fg=TEXT, font=("TkFixedFont", 9))
         self.distance_label.pack(side="right", padx=8)
-        session_row = tk.Frame(tug, bg=PANEL)
+        session_row = tk.Frame(tug_content, bg=PANEL)
         session_row.pack(fill="x", padx=10, pady=(2, 4))
         self.session_button = tk.Button(session_row, text="START SIMULATION",
                                         command=self._toggle_session, bg="#164334",
@@ -345,7 +690,7 @@ class BridgeSimulator(tk.Tk):
         self.session_status = tk.Label(session_row, text="SESSION STOPPED", bg=PANEL,
                                        fg=AMBER, font=("TkFixedFont", 8))
         self.session_status.pack(side="right", padx=(6, 0))
-        playrow = tk.Frame(tug, bg=PANEL)
+        playrow = tk.Frame(tug_content, bg=PANEL)
         playrow.pack(fill="x", padx=10, pady=(3, 2))
         self.play_button = self._button(playrow, "▶ PLAY SCHEMATIC", self._toggle_playback, CYAN)
         self.play_button.pack(side="left", fill="x", expand=True)
@@ -361,39 +706,39 @@ class BridgeSimulator(tk.Tk):
                                 padx=5, pady=5, font=("TkFixedFont", 8), cursor="hand2")
             button.pack(side="left", padx=1)
             self.rate_buttons.append((rate, button))
-        self.progress_label = tk.Label(tug, text="PATH POSITION · SCHEMATIC   0%",
+        self.progress_label = tk.Label(tug_content, text="PATH POSITION · SCHEMATIC   0%",
                                        bg=PANEL, fg=CYAN, font=("TkFixedFont", 8))
         self.progress_label.pack(anchor="w", padx=10, pady=(2, 0))
-        ttk.Scale(tug, from_=0, to=1000, variable=self.play_progress,
+        ttk.Scale(tug_content, from_=0, to=1000, variable=self.play_progress,
                   command=self._scrub_path).pack(fill="x", padx=10, pady=(0, 5))
-        tk.Label(tug, text="Visual-only playback runs during HOLD. Towlines show connection state; no tug force is modeled.",
+        tk.Label(tug_content, text="Visual-only playback runs during HOLD. Towlines show connection state; no tug force is modeled.",
                  bg=PANEL, fg=MUTED, justify="left", wraplength=275,
                  font=("TkDefaultFont", 8)).pack(fill="x", padx=10, pady=(0, 4))
-        self.advance_button = self._button(tug, "PHASE ADVANCE HELD", self._advance_phase,
+        self.advance_button = self._button(tug_content, "PHASE ADVANCE HELD", self._advance_phase,
                                            GREEN)
         self.advance_button.pack(fill="x", padx=10, pady=5)
         stations = ("Tug A · forward station · 65 t BP", "Tug B · forward station · 65 t BP",
                     "Tug C · aft station · 65 t BP", "Tug D · aft station · 65 t BP")
         for var, text in zip(self.tug_fast, stations):
-            ttk.Checkbutton(tug, text=text, variable=var,
+            ttk.Checkbutton(tug_content, text=text, variable=var,
                             command=self._refresh).pack(anchor="w", padx=10, pady=3)
-        gate = tk.Frame(tug, bg=PANEL)
+        gate = tk.Frame(tug_content, bg=PANEL)
         gate.pack(fill="x", padx=10, pady=7)
         tk.Label(gate, text="SIM SPEED GATE", bg=PANEL, fg=MUTED,
                  font=("TkDefaultFont", 8, "bold")).pack(side="left")
         self.gate_value = tk.Label(gate, text="REDUCE TO ≤ 3.0 KN", bg=PANEL,
                                    fg=AMBER, font=("TkFixedFont", 9))
         self.gate_value.pack(side="right")
-        self.tug_value = tk.Label(tug, text="0 / 4 TUGS CONNECTED", bg=PANEL,
+        self.tug_value = tk.Label(tug_content, text="0 / 4 TUGS CONNECTED", bg=PANEL,
                                   fg=AMBER, font=("TkFixedFont", 10, "bold"))
         self.tug_value.pack(anchor="w", padx=10, pady=3)
-        self.entry_button = tk.Button(tug, text="CHECK SIM INTERLOCKS",
+        self.entry_button = tk.Button(tug_content, text="CHECK SIM INTERLOCKS",
                                       command=self._confirm_entry, bg="#321e20",
                                       fg="#ffb3b7", activebackground="#4a292b",
                                       relief="flat", font=("TkDefaultFont", 9, "bold"),
                                       padx=8, pady=9, cursor="hand2")
         self.entry_button.pack(fill="x", padx=10, pady=7)
-        tk.Label(tug, text="*Illustrative distances and tug stations only. The 500 m diameter circle is an unscaled display overlay, not the vessel’s measured turning circle. The jetty and parallel alongside route are schematic, with no real berth geometry. This does not model tide/current, hydrodynamics, or port limits; controls do not grant berth clearance.",
+        tk.Label(tug_content, text="*Illustrative distances and tug stations only. The 500 m diameter circle is an unscaled display overlay, not the vessel’s measured turning circle. The jetty and parallel alongside route are schematic, with no real berth geometry. This does not model tide/current, hydrodynamics, or port limits; controls do not grant berth clearance.",
                  bg=PANEL, fg=MUTED, justify="left", wraplength=275,
                  font=("TkDefaultFont", 8)).pack(fill="x", padx=10, pady=(0, 10))
         self._load_scenario("A")
@@ -919,10 +1264,48 @@ class BridgeSimulator(tk.Tk):
         c = self.chart
         c.delete("all")
         w, h = max(c.winfo_width(), 300), max(c.winfo_height(), 300)
-        for x in range(0, w, 48):
-            c.create_line(x, 0, x, h, fill="#173142")
-        for y in range(0, h, 48):
-            c.create_line(0, y, w, y, fill="#173142")
+        # for x in range(0, w, 48):
+        #     c.create_line(x, 0, x, h, fill="#173142")
+        # for y in range(0, h, 48):
+        #     c.create_line(0, y, w, y, fill="#173142")
+        
+        
+        # Calculate the visible drawing area based on zoom and pan
+        zoom = max(0.25, min(5.0, getattr(self, "chart_zoom", 1.0)))
+        pan_x = getattr(self, "chart_pan_x", 0)
+        pan_y = getattr(self, "chart_pan_y", 0)
+
+        center_x = w / 2
+        center_y = h / 2
+
+        left = center_x + (0 - center_x - pan_x) / zoom
+        right = center_x + (w - center_x - pan_x) / zoom
+        top = center_y + (0 - center_y - pan_y) / zoom
+        bottom = center_y + (h - center_y - pan_y) / zoom
+
+        # Draw enough grid lines to cover the visible chart
+        grid_spacing = 48
+
+        start_x = math.floor(left / grid_spacing) * grid_spacing
+        end_x = math.ceil(right / grid_spacing) * grid_spacing
+
+        for x in range(start_x, end_x + grid_spacing, grid_spacing):
+            c.create_line(
+                x, top, x, bottom,
+                fill="#173142",
+                tags="chart_grid"
+            )
+
+        start_y = math.floor(top / grid_spacing) * grid_spacing
+        end_y = math.ceil(bottom / grid_spacing) * grid_spacing
+
+        for y in range(start_y, end_y + grid_spacing, grid_spacing):
+            c.create_line(
+                left, y, right, y,
+                fill="#173142",
+                tags="chart_grid"
+            )
+
         # Simplified land/contour shapes for a training display.
         c.create_oval(-w*.15, h*.67, w*.36, h*1.2, fill="#153331", outline="#37645c")
         c.create_oval(-w*.17, h*.63, w*.39, h*1.24, outline="#37645c")
@@ -1080,6 +1463,42 @@ class BridgeSimulator(tk.Tk):
                       fill=GREEN, font=("TkFixedFont", 8))
         c.create_text(12, h-12, anchor="sw", text=f"{self.phase_mode} · PATH {self.route_progress*100:.0f}% · SCHEMATIC ONLY",
                       fill=MUTED, font=("TkFixedFont", 9))
+        
+        
+        # ----------------------------------------
+        # APPLY CHART ZOOM AND PAN
+        # ----------------------------------------
+        # zoom = getattr(self, "chart_zoom", 1.0)
+        # pan_x = getattr(self, "chart_pan_x", 0)
+        # pan_y = getattr(self, "chart_pan_y", 0)
+
+        # center_x = w / 2
+        # center_y = h / 2
+
+        # # Transform the freshly drawn chart exactly once
+        # c.scale("all", center_x, center_y, zoom, zoom)
+        # c.move("all", pan_x, pan_y)
+
+        # # Update the scrollable drawing bounds
+        # bbox = c.bbox("all")
+        # if bbox:
+        #     c.configure(scrollregion=bbox)
+        
+        
+        # Apply zoom and pan once after drawing all chart items
+        c.scale("all", center_x, center_y, zoom, zoom)
+        c.move("all", pan_x, pan_y)
+
+        # Keep grid lines behind the chart features
+        c.tag_lower("chart_grid")
+
+        # Update the scrollable drawing bounds
+        bbox = c.bbox("all")
+        if bbox:
+            c.configure(scrollregion=bbox)
+
+
+
 
     def _draw_radar(self):
         if not self.radar:
@@ -1130,9 +1549,24 @@ class BridgeSimulator(tk.Tk):
         # CLOCK
         # ----------------------------------------
 
+
+        # Display UTC time UTC means Coordinated Universal Time, which is the primary time standard by which the world regulates clocks and time. It is the same worldwide and does not change with the seasons.
+        # self.clock_label.config(
+        #     text="● SIMULATION LIVE   ·   UTC " +
+        #     datetime.now(timezone.utc).strftime("%H:%M:%S")
+        # )
+        
+        # Display local time
+        # self.clock_label.config(
+        #     text="● SIMULATION LIVE   ·   LOCAL " +
+        #     datetime.now().astimezone().strftime("%H:%M:%S")
+        # )
+        
+        
+        # Display Indian Standard Time
         self.clock_label.config(
-            text="● SIMULATION LIVE   ·   UTC " +
-            datetime.now(timezone.utc).strftime("%H:%M:%S")
+            text="● SIMULATION LIVE   ·   IST " +
+            datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S")
         )
 
         # ----------------------------------------
